@@ -1,0 +1,22 @@
+# values.dev.yaml - DataHub configuration for local development
+# Deploys the ms-stack with Actions enabled. Services use ClusterIP so they
+# can be accessed via kubectl port-forward.
+
+datahub-gms:
+  service:
+    type: ClusterIP
+    port: 8080
+  extraEnvs:
+    - name: DATAHUB_ACTIONS_ENABLED
+      value: "true"
+
+datahub-frontend:
+  service:
+    type: ClusterIP
+    port: 9002
+  # Use default credentials (datahub/datahub) for the admin user.
+  defaultUserCredentials:
+    randomAdminPassword: false
+
+acryl-datahub-actions:
+  enabled: true
