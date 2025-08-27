@@ -1,0 +1,8 @@
+image: example/airflow-trigger:latest
+airflow:
+  url: http://airflow-webserver:8080
+mappings: |
+  sample_event:
+    dag_id: sample_dag
+    conf:
+      foo: bar
