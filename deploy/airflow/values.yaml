@@ -1,1 +1,3 @@
-# placeholder values
+ingress:
+  host: airflow.example.com
+  tlsSecret: airflow-tls

@@ -1,6 +1,7 @@
 image: example/airflow-trigger:latest
 airflow:
-  url: http://airflow-webserver:8080
+  url: https://airflow-webserver:8080
+  token: ""
 mappings: |
   sample_event:
     dag_id: sample_dag

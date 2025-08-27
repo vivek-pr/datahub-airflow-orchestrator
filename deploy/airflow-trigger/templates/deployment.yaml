@@ -18,6 +18,11 @@ spec:
           env:
             - name: AIRFLOW_API_BASE_URL
               value: {{ .Values.airflow.url | quote }}
+            - name: AIRFLOW_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-api-token
+                  key: token
             - name: MAPPINGS_PATH
               value: /app/config/mappings.yaml
           volumeMounts:
