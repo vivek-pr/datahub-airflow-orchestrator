@@ -210,7 +210,9 @@ def test_correlation_id_and_metrics(tmp_path, caplog):
     record = next(r for r in caplog.records if "triggered dag" in r.message)
     assert getattr(record, "correlation_id") == corr_id
 
-    metrics = requests.get(f"http://localhost:{port}/metrics").text
+    metrics = requests.get(
+        f"http://localhost:{port}/metrics", timeout=5
+    ).text
     assert "triggers_total" in metrics
     assert "latency_ms" in metrics
 
