@@ -1,0 +1,29 @@
+# values.dev.yaml - configuration for local development Airflow deployment
+# Enables webserver and scheduler and configures API authentication over TLS.
+
+# Webserver configuration
+webserver:
+  service:
+    type: ClusterIP
+    port: 8080
+  tls:
+    enabled: true
+    # Secret containing tls.crt and tls.key, create separately
+    existingSecret: airflow-dev-webserver-tls
+  # default user credentials are supplied at install time from a secret
+  defaultUser:
+    enabled: true
+    email: dev@example.com
+    firstName: Dev
+    lastName: User
+    username: admin
+    password: ""
+
+# Scheduler configuration
+scheduler:
+  replicas: 1
+
+# Airflow configuration values
+airflow:
+  config:
+    AIRFLOW__API__AUTH_BACKEND: airflow.api.auth.backend.basic_auth

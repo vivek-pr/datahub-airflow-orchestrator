@@ -1,9 +1,46 @@
-# Airflow Requirements
-- REST API enabled; auth required.
-- Webserver + Scheduler profiles for dev & prod.
-- Resource requests/limits tuned; readiness/liveness probes defined.
-- Optional: bake lineage plugin into image; pin versions.
+# Airflow Development Deployment
 
-## Acceptance Tests
-- 401 without creds; 2xx with valid auth on `POST /api/v1/dags/.../dagRuns`.
-- Sample DAG accepts `conf` and completes successfully.
+This project includes a helper profile for running Apache Airflow on a local
+Kubernetes cluster such as Minikube using the official Helm chart.
+
+## Values
+- `deploy/airflow/values.dev.yaml` enables the webserver and scheduler.
+- REST API authentication uses the `airflow.api.auth.backend.basic_auth`
+  backend.
+- TLS is enabled on the webserver and expects a secret named
+  `airflow-dev-webserver-tls` containing `tls.crt` and `tls.key`.
+- Admin credentials are not stored in git. A Kubernetes secret
+  `airflow-dev-credentials` is created during installation and passed to the
+  chart.
+
+## Usage
+Bring up and tear down the development deployment with make targets:
+
+```sh
+make airflow:dev:up   # install chart and wait for readiness
+make airflow:dev:down # remove release and namespace
+```
+
+## Accessing the API
+Port-forward the webserver service to reach the API:
+
+```sh
+kubectl port-forward svc/airflow-dev-webserver 8443:8080 -n airflow-dev
+```
+
+The API is served over HTTPS at `https://localhost:8443/api/v1`. Unauthenticated
+requests return `401`. Authenticate using the credentials stored in the
+`airflow-dev-credentials` secret:
+
+```sh
+curl -u "$AIRFLOW_DEV_USERNAME:$AIRFLOW_DEV_PASSWORD" -X POST \
+  https://localhost:8443/api/v1/dags/example_bash_operator/dagRuns \
+  -H "Content-Type: application/json" \
+  --data '{"dag_run_id": "manual_test"}'
+```
+
+## Tests
+Contract tests in `tests/contract/test_airflow_api.py` hit the API. Provide
+`AIRFLOW_API_URL`, `AIRFLOW_API_USERNAME` and `AIRFLOW_API_PASSWORD`
+environment variables to run them. The tests assert `401` without credentials
+and a `2xx` response when valid credentials are supplied.
