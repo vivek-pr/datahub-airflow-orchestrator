@@ -2,6 +2,7 @@ import sys
 import pathlib
 import logging
 import time
+import socket
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[2]))
 import requests
@@ -194,7 +195,9 @@ def test_correlation_id_and_metrics(tmp_path, caplog):
             captured["json"] = json
             return DummyResponse(200)
 
-    port = 8001
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", 0))
+        port = s.getsockname()[1]
     start_http_server(port)
     action = AirflowTriggerAction("http://airflow", str(path), session=Session())
     event = {"type": "sample_event"}

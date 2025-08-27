@@ -40,7 +40,7 @@ class AirflowTriggerAction:
         max_retries: int = 3,
         dlq_path: Optional[str] = None,
         backoff_factor: float = 0.5,
-        request_timeout: int = 5,
+        request_timeout: int = 10,
         session: Optional[requests.Session] = None,
     ) -> None:
         self.airflow_url = airflow_url.rstrip("/")
@@ -77,19 +77,24 @@ class AirflowTriggerAction:
 
         return {k: resolve(v) for k, v in conf_template.items()}
 
-    def _check_health(self) -> bool:
-        """Return True if Airflow reports healthy."""
+    def _check_health(self) -> tuple[bool, str]:
+        """Return Airflow health status and error message."""
         try:
             resp = self.session.get(
                 f"{self.airflow_url}/health", timeout=self.request_timeout
             )
             resp.raise_for_status()
             data = resp.json()
-            return all(
-                component.get("status") == "healthy" for component in data.values()
-            )
-        except Exception:
-            return False
+            unhealthy = [
+                name
+                for name, component in data.items()
+                if component.get("status") != "healthy"
+            ]
+            if not unhealthy:
+                return True, ""
+            return False, f"components not healthy: {', '.join(unhealthy)}"
+        except Exception as e:
+            return False, str(e)
 
     def _write_dlq(
         self, event: Dict[str, Any], dag_id: str, dag_run_id: str, error: str
@@ -130,9 +135,10 @@ class AirflowTriggerAction:
             dag_run_id = self._dag_run_id(dag_id, event)
             extra.update({"dag_id": dag_id, "dag_run_id": dag_run_id})
 
-            if not self._check_health():
+            healthy, error = self._check_health()
+            if not healthy:
                 trigger_counter.labels(status="circuit_open").inc()
-                raise RuntimeError("Airflow health check failed")
+                raise RuntimeError(f"Airflow health check failed: {error}")
 
             headers = {
                 "Content-Type": "application/json",

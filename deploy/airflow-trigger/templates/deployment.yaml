@@ -12,6 +12,8 @@ spec:
       labels:
         app: airflow-trigger
     spec:
+      serviceAccountName: airflow-trigger
+      automountServiceAccountToken: false
       containers:
         - name: airflow-trigger
           image: {{ .Values.image }}
