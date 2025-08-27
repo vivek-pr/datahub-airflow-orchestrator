@@ -1,0 +1,4 @@
+sample_event:
+  dag_id: sample_dag
+  conf:
+    foo: bar

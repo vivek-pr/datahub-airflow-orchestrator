@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-trigger-mappings
+data:
+  mappings.yaml: |
+{{ .Values.mappings | indent 4 }}

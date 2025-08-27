@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-trigger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-trigger
+  template:
+    metadata:
+      labels:
+        app: airflow-trigger
+    spec:
+      containers:
+        - name: airflow-trigger
+          image: {{ .Values.image }}
+          env:
+            - name: AIRFLOW_API_BASE_URL
+              value: {{ .Values.airflow.url | quote }}
+            - name: MAPPINGS_PATH
+              value: /app/config/mappings.yaml
+          volumeMounts:
+            - name: mappings
+              mountPath: /app/config
+      volumes:
+        - name: mappings
+          configMap:
+            name: airflow-trigger-mappings

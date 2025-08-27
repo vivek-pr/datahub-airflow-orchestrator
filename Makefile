@@ -7,7 +7,7 @@ lint:
 >ruff check .
 
 chart-lint:
->helm lint deploy/airflow deploy/datahub
+>helm lint deploy/airflow deploy/datahub deploy/airflow-trigger
 
 test:
 >pytest tests/unit tests/contract tests/e2e
