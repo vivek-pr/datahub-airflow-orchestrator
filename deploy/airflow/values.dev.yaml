@@ -27,3 +27,11 @@ scheduler:
 airflow:
   config:
     AIRFLOW__API__AUTH_BACKEND: airflow.api.auth.backend.basic_auth
+
+# Example DAGs pulled from repo for automatic discovery
+dags:
+  gitSync:
+    enabled: true
+    repo: https://github.com/datahub-project/datahub-airflow-orchestrator.git
+    branch: main
+    subPath: deploy/airflow/dags
