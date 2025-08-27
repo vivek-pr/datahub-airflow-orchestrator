@@ -22,3 +22,7 @@
 ## TLS
 - Airflow Ingress terminates TLS using the `airflow-tls` secret.
 - DataHub Action calls `https://` endpoints and relies on the cluster trust store to validate certificates.
+
+References:
+- [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+- [Kubernetes TLS Secrets](https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets)

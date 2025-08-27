@@ -1,6 +1,13 @@
 # Architecture (MVP)
 **Flow:** DataHub (Actions) → Airflow REST API → DAG run
 
+```mermaid
+flowchart LR
+  DH[DataHub] -->|event| AT[Airflow Trigger Action]
+  AT -->|POST dagRuns| AF[Apache Airflow]
+  AF -->|status| DH
+```
+
 ## Components
 - **DataHub** with Actions Framework enabled.
 - **Custom DataHub Action** (“Airflow Trigger”): validates, maps, signs requests, retries.
@@ -12,10 +19,12 @@
 - Observability: correlation IDs; trigger metrics; readable logs.
 
 ## Sequence (happy path)
-1) Event in DataHub (e.g., tag added, schema change, or manual run).  
-2) Action maps event → `{dag_id, conf}`.  
-3) `POST /api/v1/dags/{dag_id}/dagRuns` (auth required).  
+1) Event in DataHub (e.g., tag added, schema change, or manual run).
+2) Action maps event → `{dag_id, conf}`.
+3) [`POST /api/v1/dags/{dag_id}/dagRuns`](https://airflow.apache.org/docs/apache-airflow/stable/stable-rest-api-ref.html#operation/post_dag_run) (auth required).
 4) Airflow schedules & executes; status visible in Airflow UI and optionally in DataHub (lineage plugin).
+
+Tested with **Airflow 2.9** and **DataHub 0.10**; other versions may require adjustments.
 
 ## Alternatives & Tradeoffs
 - Direct webhooks vs sidecar service for actions.

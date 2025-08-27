@@ -7,6 +7,7 @@
 
 ## Installation (Dev)
 DataHub is deployed via Helm using the microservice stack with Actions enabled.
+Chart version pinned to **0.6.19** from [Artifact Hub](https://artifacthub.io/packages/helm/datahub/datahub).
 
 ```bash
 make datahub:dev:up
@@ -34,7 +35,7 @@ Default credentials are `datahub` / `datahub`.
 
 ## Actions
 The `acryl-datahub-actions` service hosts custom actions. Repository-local
-implementations live under the `actions/` directory.
+implementations live under the `actions/` directory. See the [DataHub Actions docs](https://docs.datahubproject.io/docs/automations/actions/).
 
 ## Acceptance Tests
 - Simulated DataHub event produces a valid trigger request.

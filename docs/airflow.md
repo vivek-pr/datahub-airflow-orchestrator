@@ -2,6 +2,7 @@
 
 This project includes a helper profile for running Apache Airflow on a local
 Kubernetes cluster such as Minikube using the official Helm chart.
+Pinned to chart **1.18.0** from [Artifact Hub](https://artifacthub.io/packages/helm/apache-airflow/airflow).
 
 ## Values
 - `deploy/airflow/values.dev.yaml` enables the webserver and scheduler.
@@ -28,8 +29,9 @@ Port-forward the webserver service to reach the API:
 kubectl port-forward svc/airflow-dev-webserver 8443:8080 -n airflow-dev
 ```
 
-The API is served over HTTPS at `https://localhost:8443/api/v1`. Unauthenticated
-requests return `401`. Authenticate using the credentials stored in the
+The API is served over HTTPS at `https://localhost:8443/api/v1` as defined in the
+[Airflow REST API](https://airflow.apache.org/docs/apache-airflow/stable/stable-rest-api-ref.html).
+Unauthenticated requests return `401`. Authenticate using the credentials stored in the
 `airflow-dev-credentials` secret:
 
 ```sh
