@@ -1,6 +1,7 @@
 import sys
 import pathlib
 import logging
+import time
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[2]))
 import requests
@@ -11,13 +12,17 @@ from actions.airflow_trigger.action import trigger_failures_total
 
 
 class DummyResponse:
-    def __init__(self, status_code: int, text: str = "ok"):
+    def __init__(self, status_code: int, text: str = "ok", json_data=None):
         self.status_code = status_code
         self.text = text
+        self._json = json_data or {}
 
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
             raise requests.HTTPError(self.text)
+
+    def json(self):
+        return self._json
 
 
 def test_mapping_and_conf(monkeypatch, tmp_path):
@@ -27,7 +32,16 @@ def test_mapping_and_conf(monkeypatch, tmp_path):
     session_calls = {}
 
     class Session:
-        def post(self, url, json, headers, auth):
+        def get(self, url, timeout=None):
+            return DummyResponse(
+                200,
+                json_data={
+                    "scheduler": {"status": "healthy"},
+                    "metadatabase": {"status": "healthy"},
+                },
+            )
+
+        def post(self, url, json, headers, auth, timeout=None):
             session_calls["url"] = url
             session_calls["json"] = json
             return DummyResponse(200)
@@ -56,7 +70,16 @@ def test_nested_conf(tmp_path):
     captured = {}
 
     class Session:
-        def post(self, url, json, headers, auth):
+        def get(self, url, timeout=None):
+            return DummyResponse(
+                200,
+                json_data={
+                    "scheduler": {"status": "healthy"},
+                    "metadatabase": {"status": "healthy"},
+                },
+            )
+
+        def post(self, url, json, headers, auth, timeout=None):
             captured["json"] = json
             return DummyResponse(200)
 
@@ -79,22 +102,34 @@ def test_idempotent_dag_run_id(tmp_path):
     assert first == second
 
 
-def test_retry_on_server_error(tmp_path):
+def test_retry_on_server_error(tmp_path, monkeypatch):
     path = tmp_path / "mappings.yaml"
     path.write_text("sample_event:\n  dag_id: d1\n")
     calls = {"count": 0}
+    sleeps = []
 
     class Session:
-        def post(self, url, json, headers, auth):
+        def get(self, url, timeout=None):
+            return DummyResponse(
+                200,
+                json_data={
+                    "scheduler": {"status": "healthy"},
+                    "metadatabase": {"status": "healthy"},
+                },
+            )
+
+        def post(self, url, json, headers, auth, timeout=None):
             calls["count"] += 1
-            if calls["count"] < 2:
+            if calls["count"] < 3:
                 return DummyResponse(500, "error")
             return DummyResponse(200)
 
+    monkeypatch.setattr(time, "sleep", lambda s: sleeps.append(s))
     action = AirflowTriggerAction("http://airflow", str(path), session=Session())
     event = {"type": "sample_event"}
     dag_run_id = action.trigger(event)
-    assert calls["count"] == 2
+    assert calls["count"] == 3
+    assert sleeps == [0.5, 1.0]
     assert dag_run_id.startswith("d1-")
 
 
@@ -103,7 +138,16 @@ def test_unauthorized(tmp_path):
     path.write_text("sample_event:\n  dag_id: d1\n")
 
     class Session:
-        def post(self, url, json, headers, auth):
+        def get(self, url, timeout=None):
+            return DummyResponse(
+                200,
+                json_data={
+                    "scheduler": {"status": "healthy"},
+                    "metadatabase": {"status": "healthy"},
+                },
+            )
+
+        def post(self, url, json, headers, auth, timeout=None):
             return DummyResponse(401, "unauthorized")
 
     action = AirflowTriggerAction("http://airflow", str(path), session=Session())
@@ -136,7 +180,16 @@ def test_correlation_id_and_metrics(tmp_path, caplog):
     captured = {}
 
     class Session:
-        def post(self, url, json, headers, auth):
+        def get(self, url, timeout=None):
+            return DummyResponse(
+                200,
+                json_data={
+                    "scheduler": {"status": "healthy"},
+                    "metadatabase": {"status": "healthy"},
+                },
+            )
+
+        def post(self, url, json, headers, auth, timeout=None):
             captured["headers"] = headers
             captured["json"] = json
             return DummyResponse(200)
@@ -164,7 +217,16 @@ def test_failure_metric(tmp_path):
     path.write_text("sample_event:\n  dag_id: d1\n")
 
     class Session:
-        def post(self, url, json, headers, auth):
+        def get(self, url, timeout=None):
+            return DummyResponse(
+                200,
+                json_data={
+                    "scheduler": {"status": "healthy"},
+                    "metadatabase": {"status": "healthy"},
+                },
+            )
+
+        def post(self, url, json, headers, auth, timeout=None):
             return DummyResponse(500, "error")
 
     action = AirflowTriggerAction(
@@ -174,3 +236,117 @@ def test_failure_metric(tmp_path):
     with pytest.raises(requests.HTTPError):
         action.trigger({"type": "sample_event"})
     assert trigger_failures_total._value.get() == before + 1
+
+
+def test_dlq_on_timeout(tmp_path, monkeypatch):
+    path = tmp_path / "mappings.yaml"
+    path.write_text("sample_event:\n  dag_id: d1\n")
+    dlq = tmp_path / "dlq.jsonl"
+
+    class Session:
+        def get(self, url, timeout=None):
+            return DummyResponse(
+                200,
+                json_data={
+                    "scheduler": {"status": "healthy"},
+                    "metadatabase": {"status": "healthy"},
+                },
+            )
+
+        def post(self, url, json, headers, auth, timeout=None):
+            raise requests.Timeout("down")
+
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    action = AirflowTriggerAction(
+        "http://airflow",
+        str(path),
+        session=Session(),
+        dlq_path=str(dlq),
+        max_retries=2,
+    )
+    with pytest.raises(requests.Timeout):
+        action.trigger({"type": "sample_event"})
+    lines = dlq.read_text().strip().splitlines()
+    assert len(lines) == 1
+
+
+def test_replay_script(tmp_path, monkeypatch):
+    path = tmp_path / "mappings.yaml"
+    path.write_text("sample_event:\n  dag_id: d1\n")
+    dlq = tmp_path / "dlq.jsonl"
+
+    class FailSession:
+        def get(self, url, timeout=None):
+            return DummyResponse(
+                200,
+                json_data={
+                    "scheduler": {"status": "healthy"},
+                    "metadatabase": {"status": "healthy"},
+                },
+            )
+
+        def post(self, url, json, headers, auth, timeout=None):
+            raise requests.ConnectionError("down")
+
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    failing_action = AirflowTriggerAction(
+        "http://airflow",
+        str(path),
+        session=FailSession(),
+        dlq_path=str(dlq),
+        max_retries=1,
+    )
+    with pytest.raises(requests.ConnectionError):
+        failing_action.trigger({"type": "sample_event"})
+
+    calls = {"count": 0}
+
+    class SuccessSession:
+        def get(self, url, timeout=None):
+            return DummyResponse(
+                200,
+                json_data={
+                    "scheduler": {"status": "healthy"},
+                    "metadatabase": {"status": "healthy"},
+                },
+            )
+
+        def post(self, url, json, headers, auth, timeout=None):
+            calls["count"] += 1
+            return DummyResponse(200)
+
+    action = AirflowTriggerAction(
+        "http://airflow",
+        str(path),
+        session=SuccessSession(),
+        dlq_path=None,
+    )
+    from scripts import replay_dlq
+
+    replay_dlq.replay(str(dlq), action)
+    assert calls["count"] == 1
+    assert dlq.read_text() == ""
+
+
+def test_circuit_breaker(tmp_path):
+    path = tmp_path / "mappings.yaml"
+    path.write_text("sample_event:\n  dag_id: d1\n")
+    dlq = tmp_path / "dlq.jsonl"
+
+    class Session:
+        def get(self, url, timeout=None):
+            return DummyResponse(
+                200,
+                json_data={"scheduler": {"status": "unhealthy"}},
+            )
+
+        def post(self, url, json, headers, auth, timeout=None):
+            raise AssertionError("should not post when unhealthy")
+
+    action = AirflowTriggerAction(
+        "http://airflow", str(path), session=Session(), dlq_path=str(dlq)
+    )
+    with pytest.raises(RuntimeError):
+        action.trigger({"type": "sample_event"})
+    lines = dlq.read_text().strip().splitlines()
+    assert len(lines) == 1
