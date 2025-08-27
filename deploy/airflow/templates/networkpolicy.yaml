@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: airflow-api
+spec:
+  podSelector:
+    matchLabels:
+      app: airflow
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: airflow-trigger
+      ports:
+        - protocol: TCP
+          port: 8080
