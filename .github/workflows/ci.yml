@@ -33,3 +33,51 @@ jobs:
           python-version: '3.10'
       - run: pip install -r requirements.txt
       - run: pytest tests/unit
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [lint, chart-lint, unit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: azure/setup-helm@v3
+        with:
+          version: v3.14.0
+      - name: Start minikube
+        uses: medyagh/setup-minikube@latest
+        with:
+          driver: docker
+      - name: Build images
+        run: |
+          docker build -t example/airflow-trigger:dev -f deploy/airflow-trigger/Dockerfile .
+      - name: Load images into cluster
+        run: |
+          minikube image load example/airflow-trigger:dev
+      - name: Install DataHub
+        run: |
+          ./scripts/datahub_dev_up.sh
+      - name: Install Airflow
+        run: |
+          ./scripts/airflow_dev_up.sh
+          helm upgrade --install airflow-trigger deploy/airflow-trigger -f deploy/airflow-trigger/values.dev.yaml -n airflow-dev
+      - name: Run tests
+        run: |
+          pip install -r requirements.txt
+          pytest tests/e2e -vv
+      - name: Collect logs
+        if: failure()
+        run: |
+          mkdir -p logs
+          for ns in airflow-dev datahub-dev; do
+            for pod in $(kubectl get pods -n $ns -o name); do
+              kubectl logs -n $ns $pod --all-containers > "logs/${ns}-${pod##*/}.log" || true
+            done
+          done
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-logs
+          path: logs
