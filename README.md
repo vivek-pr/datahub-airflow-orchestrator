@@ -26,8 +26,14 @@ Work is split into modular issues with acceptance criteria, docs, and explicit t
 ## Repo Layout
 ```
 .
-├─ .github/
-│  └─ ISSUE_TEMPLATE/          # All modular issues (Markdown)
+├─ actions/
+│  └─ airflow_trigger/         # DataHub Action source
+├─ deploy/
+│  ├─ airflow/                 # Helm chart scaffold
+│  ├─ datahub/                 # Helm chart scaffold
+│  └─ envs/
+│     ├─ dev/                  # Dev profile values
+│     └─ prod/                 # Prod profile values
 ├─ docs/
 │  ├─ architecture.md          # Big picture and sequence
 │  ├─ runbook.md               # Day-2 ops, playbooks
@@ -41,7 +47,28 @@ Work is split into modular issues with acceptance criteria, docs, and explicit t
 │  ├─ datahub.md               # DataHub requirements (Actions enabled)
 │  ├─ profiles.md              # Dev vs Prod expectations
 │  └─ CONTRIBUTING.md          # How to contribute (with AI notes)
+├─ tests/
+│  ├─ unit/                    # Fast unit tests
+│  ├─ contract/                # API/contract tests
+│  └─ e2e/                     # End-to-end tests
 └─ README.md
+```
+
+## Running CI Locally
+
+Install pinned tooling and Python dependencies:
+
+```
+asdf install
+pip install -r requirements.txt
+```
+
+Run the same checks as CI:
+
+```
+make lint
+make chart-lint
+make test
 ```
 
 ## Definition of Done (Project)
