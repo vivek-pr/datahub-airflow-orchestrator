@@ -18,6 +18,34 @@
 
 > Notes: secure the API; use allowlists for DAG IDs; add retries and a DLQ for resilience.
 
+```mermaid
+sequenceDiagram
+    participant DH as DataHub
+    participant AT as Airflow Trigger Action
+    participant AF as Apache Airflow
+    DH->>AT: event
+    AT->>AF: POST /dags/{dag_id}/dagRuns
+    AF-->>AT: dagRunId
+    AT-->>DH: ack
+```
+
+## Quickstart (Dev)
+Tested against **Airflow Helm chart 1.18.0** and **DataHub Helm chart 0.6.19**.
+
+1. Install Docker, Kubernetes (e.g., [Minikube](https://minikube.sigs.k8s.io/)), Helm ≥ 3.12, and Python 3.10.
+2. From this repository run:
+   ```bash
+   make datahub:dev:up
+   make airflow:dev:up
+   ```
+3. Follow the [demo walkthrough](docs/demo.md) to trigger a sample DAG run end‑to‑end.
+4. Tear down with `make datahub:dev:down` and `make airflow:dev:down`.
+
+Upstream references:
+- [Airflow REST API](https://airflow.apache.org/docs/apache-airflow/stable/stable-rest-api-ref.html)
+- [Airflow Helm chart](https://artifacthub.io/packages/helm/apache-airflow/airflow)
+- [DataHub Actions framework](https://docs.datahubproject.io/docs/automations/actions/)
+
 ## Project Plan
 Work is split into modular issues with acceptance criteria, docs, and explicit tests:
 - EPIC + 13 issues in `.github/ISSUE_TEMPLATE/`.
@@ -67,6 +95,7 @@ Run the same checks as CI:
 
 ```
 make lint
+lychee --accept 403,429,503 --exclude localhost README.md docs/*.md
 make chart-lint
 make test
 ```

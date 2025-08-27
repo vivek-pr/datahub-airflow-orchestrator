@@ -16,3 +16,5 @@
 - The trigger performs a health check before submitting. When Airflow
   reports unhealthy, new events are placed on the DLQ instead of being
   sent.
+
+Refer to the [Airflow troubleshooting guide](https://airflow.apache.org/docs/apache-airflow/stable/cli-and-env-variables-ref.html#troubleshooting) for core platform issues.

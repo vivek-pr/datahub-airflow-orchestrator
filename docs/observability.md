@@ -14,7 +14,8 @@ The orchestrator exposes request-level tracing and basic Prometheus metrics.
 - `trigger_failures_total` – counter of failed trigger attempts.
 - `latency_ms` – histogram of trigger round-trip latency in milliseconds.
 
-Expose metrics for scraping with:
+Expose metrics for scraping with the Python
+[`prometheus-client`](https://github.com/prometheus/client_python) library:
 
 ```python
 from prometheus_client import start_http_server
