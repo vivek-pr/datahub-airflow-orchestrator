@@ -5,6 +5,7 @@
 - **Secrets**: store in Kubernetes Secrets; never commit secrets.
 - **Network**: restrict egress; only DataHub Action can reach Airflow API.
 - **Audit**: log who/what/when; retain 30–90 days.
+- **RBAC**: dedicated ServiceAccount with no cluster-wide permissions.
 
 ## Token management
 - API tokens live in the `airflow-api-token` Secret and are mounted as `AIRFLOW_API_TOKEN`.
@@ -14,6 +15,11 @@
   kubectl rollout restart deploy/airflow-trigger
   ```
 - Store rotation history and expiry dates in your secret manager or runbook.
+
+## RBAC
+- `airflow-trigger` uses a dedicated `ServiceAccount`.
+- No `RoleBinding` is attached by default; grant only what is necessary.
+- Disable token automounting to avoid exposing unnecessary credentials.
 
 ## Network policy
 - `NetworkPolicy` restricts inbound traffic to the Airflow webserver to pods labeled `app=airflow-trigger`.
