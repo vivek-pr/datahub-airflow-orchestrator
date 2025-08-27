@@ -7,4 +7,12 @@
 - Validate mapping rules; ensure DAG is deployed and discoverable.
 
 ## Timeouts / 5xx
-- Check Airflow health; activate retries and DLQ; consider back-pressure.
+- The action automatically retries with exponential backoff and writes
+  failed events to a **dead-letter queue** file (DLQ).
+- Inspect the DLQ at the configured path and use `scripts/replay_dlq.py`
+  to resubmit once Airflow is healthy.
+
+## Airflow health is red
+- The trigger performs a health check before submitting. When Airflow
+  reports unhealthy, new events are placed on the DLQ instead of being
+  sent.
