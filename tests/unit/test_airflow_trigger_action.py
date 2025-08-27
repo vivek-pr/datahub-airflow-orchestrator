@@ -1,9 +1,13 @@
 import sys
 import pathlib
+import logging
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[2]))
 import requests
+import pytest
+from prometheus_client import start_http_server
 from actions.airflow_trigger import AirflowTriggerAction
+from actions.airflow_trigger.action import trigger_failures_total
 
 
 class DummyResponse:
@@ -123,3 +127,50 @@ def test_non_whitelisted(tmp_path):
         pass
     else:
         assert False, "Expected ValueError"
+
+
+def test_correlation_id_and_metrics(tmp_path, caplog):
+    path = tmp_path / "mappings.yaml"
+    path.write_text("sample_event:\n  dag_id: d1\n")
+
+    captured = {}
+
+    class Session:
+        def post(self, url, json, headers, auth):
+            captured["headers"] = headers
+            captured["json"] = json
+            return DummyResponse(200)
+
+    port = 8001
+    start_http_server(port)
+    action = AirflowTriggerAction("http://airflow", str(path), session=Session())
+    event = {"type": "sample_event"}
+
+    with caplog.at_level(logging.INFO):
+        action.trigger(event)
+
+    corr_id = captured["headers"]["X-Correlation-ID"]
+    assert captured["json"]["conf"]["correlation_id"] == corr_id
+    record = next(r for r in caplog.records if "triggered dag" in r.message)
+    assert getattr(record, "correlation_id") == corr_id
+
+    metrics = requests.get(f"http://localhost:{port}/metrics").text
+    assert "triggers_total" in metrics
+    assert "latency_ms" in metrics
+
+
+def test_failure_metric(tmp_path):
+    path = tmp_path / "mappings.yaml"
+    path.write_text("sample_event:\n  dag_id: d1\n")
+
+    class Session:
+        def post(self, url, json, headers, auth):
+            return DummyResponse(500, "error")
+
+    action = AirflowTriggerAction(
+        "http://airflow", str(path), session=Session(), max_retries=1
+    )
+    before = trigger_failures_total._value.get()
+    with pytest.raises(requests.HTTPError):
+        action.trigger({"type": "sample_event"})
+    assert trigger_failures_total._value.get() == before + 1
