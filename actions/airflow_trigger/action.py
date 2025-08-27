@@ -49,14 +49,19 @@ class AirflowTriggerAction:
         return f"{dag_id}-{digest}"
 
     def _resolve_conf(self, conf_template: Dict[str, Any], event: Dict[str, Any]) -> Dict[str, Any]:
-        conf: Dict[str, Any] = {}
-        for key, value in conf_template.items():
-            if isinstance(value, str) and value.startswith("{{") and value.endswith("}}"): 
+        """Recursively resolve templated conf values from the event."""
+
+        def resolve(value: Any) -> Any:
+            if isinstance(value, str) and value.startswith("{{") and value.endswith("}}"):
                 event_key = value.strip("{} ")
-                conf[key] = event.get(event_key)
-            else:
-                conf[key] = value
-        return conf
+                return event.get(event_key)
+            if isinstance(value, dict):
+                return {k: resolve(v) for k, v in value.items()}
+            if isinstance(value, list):
+                return [resolve(v) for v in value]
+            return value
+
+        return {k: resolve(v) for k, v in conf_template.items()}
 
     def trigger(self, event: Dict[str, Any]) -> str:
         """Trigger a DAG run for the given event."""

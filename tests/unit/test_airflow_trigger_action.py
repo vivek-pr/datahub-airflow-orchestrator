@@ -37,6 +37,34 @@ def test_mapping_and_conf(monkeypatch, tmp_path):
     assert dag_run_id.startswith("d1-")
 
 
+def test_nested_conf(tmp_path):
+    path = tmp_path / "mappings.yaml"
+    path.write_text(
+        "sample_event:\n"
+        "  dag_id: d1\n"
+        "  conf:\n"
+        "    outer:\n"
+        "      inner: '{{bar}}'\n"
+        "    list:\n"
+        "      - '{{bar}}'\n"
+    )
+
+    captured = {}
+
+    class Session:
+        def post(self, url, json, headers, auth):
+            captured["json"] = json
+            return DummyResponse(200)
+
+    action = AirflowTriggerAction("http://airflow", str(path), session=Session())
+    event = {"type": "sample_event", "bar": "baz"}
+    action.trigger(event)
+
+    conf = captured["json"]["conf"]
+    assert conf["outer"]["inner"] == "baz"
+    assert conf["list"][0] == "baz"
+
+
 def test_idempotent_dag_run_id(tmp_path):
     path = tmp_path / "mappings.yaml"
     path.write_text("sample_event:\n  dag_id: test\n")
