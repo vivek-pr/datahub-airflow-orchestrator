@@ -1,4 +1,6 @@
-import sys, pathlib
+import sys
+import pathlib
+
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[2]))
 import requests
 from actions.airflow_trigger import AirflowTriggerAction
