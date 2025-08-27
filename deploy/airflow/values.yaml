@@ -1,3 +1,10 @@
 ingress:
   host: airflow.example.com
   tlsSecret: airflow-tls
+
+airflow:
+  extraPipPackages:
+    - "acryl-datahub[airflow]==0.14.0"
+  config:
+    AIRFLOW__LINEAGE__BACKEND: datahub_provider.lineage.datahub.DatahubLineageBackend
+    DATAHUB_GMS_URL: http://datahub-gms:8080
